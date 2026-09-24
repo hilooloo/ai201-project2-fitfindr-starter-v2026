@@ -40,8 +40,7 @@
 ## What This Does
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
-
-
+FitFindr is an intelligent thrifting agent that helps users discover second-hand fashion pieces and seamlessly style them. A user provides a natural language search query specifying an aesthetic or item, optional size preferences, and a budget constraint. The agent parses the request, filters matching listings across platforms, cross-references candidate pieces with the user's existing wardrobe to suggest cohesive outfit pairings, and crafts a ready-to-post aesthetic caption. If no matching listings are found within the criteria, it halts early and provides clear recommendations on how to broaden the search.
 
 ---
 
@@ -60,23 +59,35 @@
 ### `search_listings`
 
 - **What it does:**
+Searches the secondhand listings dataset and filters items matching query description keywords, an optional clothing size, and an optional maximum price threshold.
 - **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
+`description` (str), `size` (str or None), `max_price` (float or None)
 - **Returns:**
+A list of listing dicts, each containing `id` (str), `title` (str), `description` (str), `category` (str), `style_tags` (list[str]), `size` (str), `condition` (str), `price` (float), `colors` (list[str]), `brand` (str or None), and `platform` (str).
 - **When it has nothing:**
+An empty list `[]`.
 
 ### `suggest_outfit`
 
 - **What it does:**
+Recommends styling pairings combining a newly selected thrift listing with complementary pieces from the user's saved wardrobe.
 - **Inputs:**
+`new_item` (dict containing `id`, `title`, `category`, `style_tags`, `colors`, and `price`), `wardrobe` (list[dict], each containing `id`, `name`, `category`, `colors`, `style_tags`, and `notes`)
 - **Returns:**
+A string containing outfit recommendations and styling advice.
 - **When it has nothing:**
+A string containing general standalone styling and pairing advice when the wardrobe list is empty (`[]`).
 
 ### `create_fit_card`
 
 - **What it does:**
+Generates a short, engaging social media caption highlighting key item attributes, pairing notes, and style vibes.
 - **Inputs:**
+`outfit` (str), `new_item` (dict containing `title`, `price`, `brand`, and `platform`)
 - **Returns:**
+A string containing a ready-to-post caption with item highlights and relevant style hashtags.
 - **When it has nothing:**
+An empty string `""`.
 
 ---
 
@@ -94,12 +105,15 @@
      function have to be real. -->
 
 **Branch rule:**
+If `search_listings` returns an empty list, put a message in the session explaining what to adjust and stop before calling `suggest_outfit`. Otherwise, take the first matched listing into `session["selected_item"]` and proceed to `suggest_outfit`.
 
 **Where it lives:** `agent.py::run_agent`
 
 **How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+regex and keyword extraction
 
 **What moves through the session:** <!-- which fields, in what order -->
+`query` -> `search_results` -> `selected_item` -> `wardrobe` -> `outfit_suggestion` -> `fit_card`
 
 ---
 
