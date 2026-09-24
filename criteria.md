@@ -28,6 +28,7 @@ tool calls and returns a fit card — in at least 4 of 5 tries.
 <!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
      "my search is a plain keyword match and some phrasings will miss" is a
      real answer. -->
+I picked 4 of 5 because search filtering relies on plain keyword matching against user queries; subtle differences in phrasing, unexpected adjectives, or dataset edge cases could occasionally cause a valid item to be missed on the first try.
 
 ---
 
@@ -39,6 +40,7 @@ Given a query that matches no listings, the agent stops before calling
 **Why this target:**
 <!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
      about this path? -->
+5 of 5 is achievable because the branching rule is purely deterministic Python logic checking `len(search_results) == 0`. It does not rely on model generation or probabilistic choices, so it should stop every single time without exception.
 
 ---
 
@@ -53,11 +55,10 @@ Given a query that matches no listings, the agent stops before calling
      look like state failure — it looks like a tool problem. Something that
      compares session["selected_item"] against what actually reached
      suggest_outfit is the shape you're after. -->
-
-
+When `search_listings` selects an item, the dictionary passed into `suggest_outfit` contains the exact same `id` and `title` stored in `session["selected_item"]` — 5 of 5 tries.
 
 **Why this target:**
-
+State transfer between tools is internal dictionary assignment within the agent script. There is no external network or LLM reasoning involved in passing variables, so the state must maintain 100% integrity across every run.
 
 
 ---
@@ -74,11 +75,11 @@ Given a query that matches no listings, the agent stops before calling
      mentions the price? Two different items producing the same opening
      sentence? A card longer than a caption anyone would post? Any of those can
      be turned into a number. -->
-
+When `create_fit_card` generates a caption for a valid item, the generated text explicitly includes the item's price (e.g. `$` followed by digits) and at least one hashtag (`#`) — in at least 4 of 5 tries.
 
 
 **Why this target:**
-
+`create_fit_card` calls an LLM, which introduces natural generative variability. While the prompt explicitly instructs the model to include the item price and styling hashtags, allowing 1 potential miss out of 5 accounts for minor probabilistic drift or formatting quirks from the model.
 
 
 ---
@@ -91,11 +92,12 @@ Given a query that matches no listings, the agent stops before calling
      wardrobe path, what happens when the model can't be reached, whether the
      search respects a price ceiling — anything, as long as it names a number
      or an observable outcome. -->
+Given a query containing an explicit price ceiling (e.g., 'under $30'), every listing returned by `search_listings` has a `price` less than or equal to that numeric ceiling — 5 of 5 tries.
 
 
 
 **Why this target:**
-
+Filtering on price is a numerical comparison (`price <= max_price`) implemented in Python code. If the query parser correctly extracts the dollar figure, the mathematical filter should never return an item exceeding the user's budget.
 
 
 ---
