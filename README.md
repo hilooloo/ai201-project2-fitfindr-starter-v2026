@@ -135,16 +135,21 @@ $ python app.py ask '...'
 
 ```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
+[{'id': 'lst_002', 'title': 'Y2K Baby Tee — Butterfly Print', 'description': 'Super cute early 2000s baby tee with butterfly graphic. Fitted crop length. Tag says medium but fits like a small.', 'category': 'tops', 'style_tags': ['y2k', 'vintage', 'graphic tee', 'cottagecore'], 'size': 'S/M', 'condition': 'excellent', 'price': 18.0, 'colors': ['white', 'pink', 'purple'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_006', 'title': 'Graphic Tee — 2003 Tour Bootleg Style', 'description': 'Vintage-style bootleg tee with faded graphic. Slightly boxy fit. 100% cotton, soft and worn-in.', 'category': 'tops', 'style_tags': ['graphic tee', 'vintage', 'grunge', 'streetwear', 'band tee'], 'size': 'L', 'condition': 'good', 'price': 24.0, 'colors': ['black'], 'brand': None, 'platform': 'depop'}]
 
 ```
 
 ```
 $ python -c "from tools import suggest_outfit; ..."
+from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+Here are two cohesive outfits you can create by adding the vintage Levi's 501 jeans to your current wardrobe:
 
 ```
 
 ```
 $ python -c "from tools import create_fit_card; ..."
+from utils.data_loader import load_listings; print(create_fit_card('vintage Levis with white tank and chunky sneakers', load_listings()[0]))"
+Still not over scoring these vintage Levi's 501 jeans on Depop for just $38! The wash is literal perfection and they fit like a absolute dream. Throwing them on with a simple white tank and chunky sneakers for the ultimate effortless look. #thrifted #streetwear
 
 ```
 
