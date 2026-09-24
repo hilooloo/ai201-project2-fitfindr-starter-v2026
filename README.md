@@ -192,14 +192,20 @@ Still not over scoring these vintage Levi's 501 jeans on Depop for just $38! The
 **Moment 1**
 
 - *What I asked for:*
+I asked why `create_fit_card` generated word-for-word identical outputs across multiple test runs on the same item, and how to verify output variability.
 - *What came back:*
+The explanation identified that `config.py` had caching enabled (`CACHE_ENABLED`), meaning subsequent calls with identical prompts bypassed the model and reused stored responses.
 - *What I changed:*
+Instead of altering source configurations prematurely, I passed `AI201_CACHE="0"` via the environment variable during terminal runs to disable caching and verified that the model produced natural phrasing and formatting variations.
 
 **Moment 2**
 
 - *What I asked for:*
+I asked for the implementation of the planning loop in `agent.py` to coordinate query parsing, tool execution, and session-based state propagation.
 - *What came back:*
+An implementation structuring the query regex parser and ensuring all intermediate states (`parsed`, `search_results`, `selected_item`, `outfit_suggestion`, `fit_card`) were routed strictly through the `session` dictionary rather than direct variable chaining.
 - *What I changed:*
+For the empty search branch, I refined `session["error"]` so that instead of a generic "No results" string, it specifically directed the user on what filters to relax (raising the price ceiling or removing size/keyword constraints) and ensured `fit_card` remained `None`.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
