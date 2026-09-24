@@ -13,10 +13,50 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
+
+
+# ── query parsing ─────────────────────────────────────────────────────────────
+
+_PRICE_RE = re.compile(
+    r"\b(?:under|below|less than)\s*\$?(\d+(?:\.\d+)?)", re.IGNORECASE
+)
+_SIZE_RE = re.compile(r"\bsize\s+([A-Za-z0-9/]+)", re.IGNORECASE)
+
+
+def parse_query(query: str) -> dict:
+    """
+    Pull a max_price, a size, and a cleaned description out of a plain-language
+    query.
+
+    e.g. "vintage graphic tee under $30, size M" ->
+        {"description": "vintage graphic tee", "size": "M", "max_price": 30.0}
+    """
+    max_price = None
+    price_match = _PRICE_RE.search(query)
+    if price_match:
+        max_price = float(price_match.group(1))
+
+    size = None
+    size_match = _SIZE_RE.search(query)
+    if size_match:
+        size = size_match.group(1)
+
+    description = query
+    if price_match:
+        description = description[: price_match.start()] + description[price_match.end():]
+    if size_match:
+        description = description.replace(size_match.group(0), "")
+
+    description = re.sub(r"[,]+", " ", description)
+    description = re.sub(r"\s+", " ", description).strip()
+
+    return {"description": description, "size": size, "max_price": max_price}
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -107,8 +147,43 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    iteration = 1
+    trace.check_iterations(iteration)
+
+    session["parsed"] = parse_query(query)
+
+    results = search_listings(
+        description=session["parsed"]["description"],
+        size=session["parsed"]["size"],
+        max_price=session["parsed"]["max_price"],
+    )
+    session["search_results"] = results
+
+    if len(results) == 0:
+        session["error"] = (
+            "No thrift listings matched your filters. Try raising your price "
+            "ceiling, dropping the size filter, or broadening your search "
+            "terms — very specific adjectives or brands narrow the match "
+            "down to nothing."
+        )
+        return session
+
+    session["selected_item"] = results[0]
+
+    iteration += 1
+    trace.check_iterations(iteration)
+
+    session["outfit_suggestion"] = suggest_outfit(
+        new_item=session["selected_item"], wardrobe=session["wardrobe"]
+    )
+
+    iteration += 1
+    trace.check_iterations(iteration)
+
+    session["fit_card"] = create_fit_card(
+        outfit=session["outfit_suggestion"], new_item=session["selected_item"]
+    )
+
     return session
 
 

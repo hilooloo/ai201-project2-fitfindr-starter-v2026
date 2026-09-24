@@ -127,7 +127,32 @@ regex and keyword extraction
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask "looking for a vintage graphic tee under $30"
+
+Found:    Mesh Long-Sleeve Top — Black — $15.0 on depop
+
+Outfit:   Here are two cohesive outfits using the new mesh long-sleeve top and pieces from your current wardrobe:
+
+Outfit 1: 90s Grunge Streetwear
+- Top: Mesh Long-Sleeve Top (layered over the White ribbed tank top for a textured, high-contrast look)
+- Bottoms: Baggy straight-leg jeans, dark wash
+- Shoes: Black combat boots
+- Outerwear: Vintage black denim jacket
+- Accessories: Black crossbody bag
+
+Why it works: Layering the sheer black mesh top over the white ribbed tank creates a striking contrast that leans heavily into the 90s grunge and Y2K aesthetic. Pairing it with baggy dark-wash jeans and black combat boots keeps the silhouette balanced (fitted on top, relaxed on the bottom) while tying the dark color palette together. Throwing on the vintage black denim jacket and crossbody bag finishes off an effortless, edgy streetwear look.
+
+Outfit 2: Contrast & Texture Play
+- Top: Mesh Long-Sleeve Top (worn under the Oversized grey crewneck sweatshirt with the collar and cuffs peeking out)
+- Bottoms: Wide-leg khaki trousers
+- Shoes: Chunky white sneakers
+- Accessories: Brown leather belt
+
+Why it works: This outfit plays with style juxtaposition by blending the grunge/goth mesh top with the minimalist, earth-toned pieces in your closet. By peeking the mesh sleeves and neckline out from under the oversized grey crewneck, you add instant texture and dimension to a basic sweatshirt. Tucking it into the wide-leg khaki trousers (cinched with the brown leather belt) grounds the look with warm neutrals, and the chunky white sneakers add a modern, casual finish.
+
+Fit card: Obsessed is an understatement! Snagged this black mesh long-sleeve top on Depop for just $15, and I’m already living in it. Whether I'm layering it over a white tank for that 90s grunge feel or peeking the cuffs out of a cozy crewneck, it adds the coolest texture to everything. #thrifted #streetwear
+
+2 model calls this session, 814 prompt + 466 output tokens
 
 ```
 
