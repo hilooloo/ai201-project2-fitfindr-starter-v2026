@@ -289,21 +289,52 @@ that produced it:
 **Happy path**
 
 ```
+$ python app.py ask 'vintage graphic tee under $30' --trace
 
+[1] search_listings
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[2] suggest_outfit
+      in:  dict with keys: item, wardrobe
+      out: Here are two cohesive outfits you can build using the **Y2K Baby Tee — Butterfly Print** and your current ward…
+[3] create_fit_card
+      in:  dict with keys: item, outfit
+      out: Still not over the absolute steal I scored on Depop—this Y2K Baby Tee — Butterfly Print was only $18.0! I am s…
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
 
+[1] search_listings
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+      →    branch: empty, stopping
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**On the MCP move:** `search_listings` now runs through `mcp_client.call_tool("search_listings", ...)` instead of being imported and called directly — `agent.py` no longer imports the function from `tools.py` at all, only `suggest_outfit` and `create_fit_card`. Step `[1]` in the trace above is that MCP call: the `in`/`out` values are identical in shape and content to what the direct call produced before the rewire (same 10 listings, same ordering, same empty list on the no-match query), confirming the protocol boundary didn't change the tool's behavior — only how it's invoked.
 
+**All three failure modes, triggered on purpose:**
 
+| Failure mode | How I triggered it | User-facing message | Where it's handled |
+|---|---|---|---|
+| Empty search | `python app.py ask 'designer ballgown size XXS under $5'` | "No thrift listings matched your filters. Try raising your price ceiling, dropping the size filter, or broadening your search terms — very specific adjectives or brands narrow the match down to nothing." | `agent.py::run_agent` — stops before `suggest_outfit`, `session["error"]` set, `fit_card` stays `None` |
+| Empty wardrobe | `python app.py ask 'denim jacket under $50' --empty-wardrobe` | A full paragraph of general styling advice for the item, instead of outfit pairings naming owned pieces | `tools.py::suggest_outfit` — branches on `wardrobe["items"]` being empty |
+| Model unavailable | Ran with `GEMINI_API_KEY` set to a bad value | "Couldn't generate an outfit suggestion: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com." | `agent.py::run_agent` — `suggest_outfit`/`create_fit_card` wrapped in `try/except ModelUnavailable`, `session["error"]` set, loop stops before the next tool call |
+
+```
+$ GEMINI_API_KEY=bad_key_on_purpose python app.py ask 'vintage graphic tee under $30' --trace
+
+[1] search_listings
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[2] suggest_outfit
+      in:  dict with keys: item, wardrobe
+      →    branch: model unavailable, stopping
+
+  Couldn't generate an outfit suggestion: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+```
 
 ---
 
