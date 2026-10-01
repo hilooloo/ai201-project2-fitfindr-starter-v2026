@@ -207,6 +207,15 @@ An implementation structuring the query regex parser and ensuring all intermedia
 - *What I changed:*
 For the empty search branch, I refined `session["error"]` so that instead of a generic "No results" string, it specifically directed the user on what filters to relax (raising the price ceiling or removing size/keyword constraints) and ensured `fit_card` remained `None`.
 
+**Moment 3**
+
+- *What I asked for:*
+How to implement a single, high-leverage improvement in `tools.py::search_listings` to address the flat keyword matching identified in our Milestone 4 diagnosis, without changing prompts or loop architecture.
+- *What came back:*
+A field-weighted scoring design (title: 3, style_tags: 2, category/description/colors/brand: 1), along with a suggestion to verify the ranking behavior deterministically with a direct Python snippet before running the full 50-call eval harness.
+- *What I changed:*
+I ran the side-by-side script comparing old vs. new ranking on queries like "graphic tee" and "band tee," confirmed that title-matching items moved to rank #1, and kept the change strictly contained to `tools.py` without touching prompt text or adding external dependencies.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -439,6 +448,11 @@ No criterion is currently missed, so this is about the agent's real limitations 
 - **No synonym or semantic matching.** `search_listings` only ever checks literal token membership. A user who searches "coat" gets nothing for a listing titled "Denim Jacket," and "sneakers" won't find "Chunky white sneakers" if the query instead says "trainers." Fixing this needs either a synonym table (cheap, brittle, needs maintenance per category) or real embedding-based similarity (the `generate()` adapter's model could do this, but that turns a free, instant, deterministic tool call into a paid, latency-bound one — a real tradeoff, not a strict upgrade).
 - **No aesthetic/vibe matching.** The data has real style vocabulary (`cottagecore`, `grunge`, `Y2K`) that only helps when the user's query happens to use the same word. "something for a soft, dreamy spring day" won't surface `cottagecore`-tagged items even though that's exactly the vibe — there's no vector space here, just exact tokens.
 - **The new weighting can still misrank when a generic word out-scores a specific one.** For `"oversized hoodie"`, the one listing literally titled *"Vintage Graphic Hoodie — Faded Black"* ranks 4th, below *"Oversized Crewneck Sweatshirt — Vintage Navy"* — because "oversized" happens to appear in that sweatshirt's title **and** its style_tags (3 + 2 = 5), while "hoodie" only appears in the hoodie's title and description (3 + 1 = 4). The scoring has no concept of which query word is the actual item type (the noun) versus a modifier, so a modifier matching in more fields can outrank the noun match. A fuller fix would weight the head noun of the query higher than its modifiers, which needs at least basic phrase structure, not just a bag of weighted tokens.
+
+**What I'd do:** integrate embedding-based semantic retrieval so queries like "coat" or "something for a soft, dreamy spring day" can match on meaning, not just shared tokens, fixing both the synonym gap and the vibe-matching gap in one mechanism. Separately, add basic syntactic parsing (even just a part-of-speech tag) so the query's head noun ("hoodie") is weighted above its modifiers ("oversized"), instead of treating every token the same way regardless of grammatical role.
+
+**Why I stopped there:** Milestone 5 strictly enforced a "one change only" rule, and that change was already spent on the field-weighting fix. Bringing in an embedding model or an NLP dependency like spaCy/NLTK for part-of-speech tagging would mean new external dependencies, network calls or model downloads, added latency on every search, and a real risk of breaking the other two tools' expectations about what `search_listings` returns and how fast — all out of scope for a single targeted fix and well past the roughly 55-minute budget this milestone gives for one change, measured properly.
+
 - **Very narrow price bands can leave too few genuinely relevant results**, independent of ranking. `"leather jacket under $30"` and `"denim jacket under $25"` each return exactly one listing, and in the first case it's not even a jacket — because the dataset simply has no jacket at that price. Better ranking can't fix a missing item; this would need either a bigger/denser catalog or a fallback that tells the user "nothing under $30, but here's the cheapest jacket at $75" instead of silently returning the closest unrelated thing that happens to fit the budget.
 
 <!-- ═════════════════════════════════════════════════════════════════════
