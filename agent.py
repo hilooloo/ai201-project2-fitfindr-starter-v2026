@@ -17,7 +17,8 @@ import re
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+from mcp_client import call_tool
+from tools import suggest_outfit, create_fit_card
 from generate import ModelUnavailable
 
 
@@ -150,13 +151,14 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     iteration = 1
     trace.check_iterations(iteration)
 
-    session["parsed"] = parse_query(query)
+    parsed = parse_query(query)
+    session["parsed"] = parsed
 
-    results = search_listings(
-        description=session["parsed"]["description"],
-        size=session["parsed"]["size"],
-        max_price=session["parsed"]["max_price"],
-    )
+    results = call_tool("search_listings", {
+        "description": parsed.get("description", query),
+        "size": parsed.get("size"),
+        "max_price": parsed.get("max_price"),
+    })
     session["search_results"] = results
 
     if len(results) == 0:
