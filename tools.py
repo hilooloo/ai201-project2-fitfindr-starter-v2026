@@ -103,20 +103,39 @@ def search_listings(
                 continue
         candidates.append(item)
 
-    desc_tokens = [t for t in re.split(r"\W+", description.lower()) if t]
+    def tokenize(text: str) -> set[str]:
+        return {t for t in re.split(r"\W+", text.lower()) if t}
+
+    query_tokens = tokenize(description)
+
+    # Title and style_tags are where a listing states what it IS, so a match
+    # there is stronger evidence than the same word turning up in the free-text
+    # description or an incidental color/brand field.
+    FIELD_WEIGHTS = {
+        "title": 3,
+        "style_tags": 2,
+        "category": 1,
+        "description": 1,
+        "colors": 1,
+        "brand": 1,
+    }
 
     scored = []
     for item in candidates:
-        text_parts = [
-            item.get("title", ""),
-            item.get("description", ""),
-            item.get("category", ""),
-            " ".join(item.get("style_tags", []) or []),
-            " ".join(item.get("colors", []) or []),
-            item.get("brand") or "",
-        ]
-        item_text = " ".join(text_parts).lower()
-        score = sum(1 for token in desc_tokens if token in item_text)
+        field_tokens = {
+            "title": tokenize(item.get("title", "")),
+            "description": tokenize(item.get("description", "")),
+            "category": tokenize(item.get("category", "")),
+            "style_tags": tokenize(" ".join(item.get("style_tags") or [])),
+            "colors": tokenize(" ".join(item.get("colors") or [])),
+            "brand": tokenize(item.get("brand") or ""),
+        }
+        score = sum(
+            weight
+            for field, weight in FIELD_WEIGHTS.items()
+            for token in query_tokens
+            if token in field_tokens[field]
+        )
         if score > 0:
             scored.append((score, item))
 

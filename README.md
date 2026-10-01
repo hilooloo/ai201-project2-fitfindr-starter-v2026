@@ -401,34 +401,45 @@ $ GEMINI_API_KEY=bad_key_on_purpose python app.py ask 'vintage graphic tee under
 
 **What I changed:**
 
+`tools.py::search_listings`'s scoring step, and nothing else — no prompts, no other tool, no loop logic. Before: the query was split on non-word characters into a flat token list, and a listing's score was "how many query tokens appear anywhere in the concatenated title + description + category + style_tags + colors + brand text" — every field counted equally, and a plain substring/membership check on the joined string meant a field's match weight was indistinguishable from any other field's. After: each field is tokenized into its own word set, and a match is scored per field with explicit weights (`title: 3`, `style_tags: 2`, `category/description/colors/brand: 1`), then summed across all fields a query token matches in. A listing titled *"Graphic Tee — 2003 Tour Bootleg Style"* now outscores one that only shares a word in its description, instead of the two being weighted identically. Sorting and the `config.SEARCH_RESULT_LIMIT` cutoff are unchanged.
+
 **Which failure it was meant to fix:**
+
+The Milestone 4 diagnosis named `tools.py::search_listings` + `agent.py::parse_query` as the most fragile step: flat keyword-token conjunction with no field weighting, which it predicted would let weak, incidental matches outrank or crowd out the listing that actually names the thing the user asked for — especially once a tight price ceiling narrowed the candidate pool.
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item in session matches item passed to suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card mentions price and at least one hashtag | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. All returned listings respect numeric price ceiling | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+Full output: `results/run_2026-09-30_2137_after.md` (50 model calls, 0 crashes — same shape as the before run).
 
 **Did it help, and how do I know:**
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+Honestly: the five criteria's pass/fail counts didn't move — they were already 5/5 before, because none of the five actually measure *ranking quality*. Criterion 5 checks "is every returned price ≤ ceiling," which is a property of the unchanged price filter, not of scoring; it would stay 5/5 no matter how the results were ordered. So the eval table alone can't show this change did anything, and I'm not going to pretend it does.
 
+What *does* show the fix working is the actual selection a query produces, and it's visible in the two run logs' own output:
 
+- **Criterion 1, try 1 ("vintage graphic tee under $30")** — `results/run_2026-09-30_2101_before.md` picked **"Y2K Baby Tee — Butterfly Print"** as `selected_item` (a tee that matches via style tags like `y2k`, `vintage`, `graphic tee`, but whose *title* doesn't say "graphic"). `results/run_2026-09-30_2137_after.md` picks **"Graphic Tee — 2003 Tour Bootleg Style"** instead — the one listing whose title literally contains both "graphic" and "tee." That's the weighting working as designed: a title match now outranks a tags-only match.
+- A direct, reproducible side-by-side (old scoring function vs. new, same data, no model involved) confirms this isn't a one-off: for the query **"band tee"**, the old algorithm ranked "Graphic Tee — 2003 Tour Bootleg Style" above "Vintage Band Tee — Faded Grey" (both only share the word "tee"), even though the second listing's title literally contains "band." The new algorithm correctly puts "Vintage Band Tee — Faded Grey" first.
+
+**Where it did *not* help, and I was wrong about why:** The diagnosis's named repro case — `"leather jacket under $30"` returning only a leather belt — is **unchanged** after the fix, and re-checking the raw data shows why: the cheapest real leather jacket in `data/listings.json` ("90s Leather Bomber — Black") costs $75; nothing jacket-shaped exists under $30 at all. No amount of re-ranking manufactures inventory that isn't there. My Milestone 4 diagnosis conflated two different problems — weak ranking (real, and now improved) and a price ceiling with zero true matches in the dataset (a data-coverage limit, not a ranking bug) — and picked an example that was actually the second one. The fix is real, but that specific example was never going to be fixed by it.
 
 ---
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+No criterion is currently missed, so this is about the agent's real limitations rather than a failing test — things the eval table can't see because none of the five criteria test for them.
 
-
+- **No synonym or semantic matching.** `search_listings` only ever checks literal token membership. A user who searches "coat" gets nothing for a listing titled "Denim Jacket," and "sneakers" won't find "Chunky white sneakers" if the query instead says "trainers." Fixing this needs either a synonym table (cheap, brittle, needs maintenance per category) or real embedding-based similarity (the `generate()` adapter's model could do this, but that turns a free, instant, deterministic tool call into a paid, latency-bound one — a real tradeoff, not a strict upgrade).
+- **No aesthetic/vibe matching.** The data has real style vocabulary (`cottagecore`, `grunge`, `Y2K`) that only helps when the user's query happens to use the same word. "something for a soft, dreamy spring day" won't surface `cottagecore`-tagged items even though that's exactly the vibe — there's no vector space here, just exact tokens.
+- **The new weighting can still misrank when a generic word out-scores a specific one.** For `"oversized hoodie"`, the one listing literally titled *"Vintage Graphic Hoodie — Faded Black"* ranks 4th, below *"Oversized Crewneck Sweatshirt — Vintage Navy"* — because "oversized" happens to appear in that sweatshirt's title **and** its style_tags (3 + 2 = 5), while "hoodie" only appears in the hoodie's title and description (3 + 1 = 4). The scoring has no concept of which query word is the actual item type (the noun) versus a modifier, so a modifier matching in more fields can outrank the noun match. A fuller fix would weight the head noun of the query higher than its modifiers, which needs at least basic phrase structure, not just a bag of weighted tokens.
+- **Very narrow price bands can leave too few genuinely relevant results**, independent of ranking. `"leather jacket under $30"` and `"denim jacket under $25"` each return exactly one listing, and in the first case it's not even a jacket — because the dataset simply has no jacket at that price. Better ranking can't fix a missing item; this would need either a bigger/denser catalog or a fallback that tells the user "nothing under $30, but here's the cheapest jacket at $75" instead of silently returning the closest unrelated thing that happens to fit the budget.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
