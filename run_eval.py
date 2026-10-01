@@ -37,8 +37,9 @@ import config
 import scenarios as scenario_module
 
 
-def run_once(scenario, use_trace=True):
-    """One scenario, one try. Returns everything worth recording."""
+def run_once(scenario, query, use_trace=True):
+    """One scenario, one try, with the query for this specific try. Returns
+    everything worth recording."""
     from agent import run_agent
     from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
     import trace as trace_module
@@ -50,9 +51,9 @@ def run_once(scenario, use_trace=True):
     if use_trace:
         trace_module.start_trace()
 
-    record = {"error": None, "session": None, "trace": "", "crashed": None}
+    record = {"error": None, "session": None, "trace": "", "crashed": None, "query": query}
     try:
-        record["session"] = run_agent(scenario["query"], wardrobe)
+        record["session"] = run_agent(query, wardrobe)
     except Exception as exc:  # noqa: BLE001 — a crash is a result worth logging
         record["crashed"] = f"{type(exc).__name__}: {exc}"
         record["traceback"] = traceback.format_exc()
@@ -90,12 +91,14 @@ def main():
 
     rows = []
     for scenario in scenario_module.SCENARIOS:
+        queries = scenario_module._queries(scenario)
         print(f"{scenario['name']}  ({scenario['wardrobe']} wardrobe)")
-        print(f"  query: {scenario['query']}")
 
         tries = []
         for attempt in range(1, args.tries + 1):
-            record = run_once(scenario)
+            query = queries[(attempt - 1) % len(queries)]
+            print(f"  query: {query}")
+            record = run_once(scenario, query)
             tries.append(record)
 
             if record["crashed"]:
@@ -173,12 +176,12 @@ def write_report(rows, args):
     for row in rows:
         scenario = row["scenario"]
         lines += [f"### {scenario['name']}", "",
-                  f"- Query: `{scenario['query']}`",
                   f"- Wardrobe: {scenario['wardrobe']}", ""]
 
         for i, record in enumerate(row["tries"], 1):
             lines.append(f"**Try {i}**")
             lines.append("")
+            lines.append(f"- query: `{record.get('query', '')}`")
 
             if record["crashed"]:
                 lines += ["Crashed:", "", "```", record["crashed"], "```", ""]
@@ -188,7 +191,7 @@ def write_report(rows, args):
             item = session.get("selected_item") or {}
             lines += [
                 f"- stopped early: {'yes — ' + str(session.get('error')) if session.get('error') else 'no'}",
-                f"- selected_item: {item.get('title', '(none)')}"
+                f"- selected_item: {item.get('id', '(none)')} — {item.get('title', '(none)')}"
                 + (f" (${item.get('price')}, {item.get('platform')})" if item else ""),
                 f"- search_results: {len(session.get('search_results') or [])}",
                 "",

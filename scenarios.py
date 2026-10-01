@@ -9,54 +9,110 @@ and this file is where you write it down.
 `run_eval.py` runs everything here five times and writes the run log — five
 because your criteria are written out of five.
 
-Three scenarios are filled in to show the shape. Add or change whatever your
-own criteria need — these are a starting point, not a fixed set.
+One scenario per criterion below (criteria.md has five). Each scenario lists
+five *different* queries in "queries" — one per try — rather than repeating a
+single query five times. For criteria 2, 3, and 5 the checked behavior is
+deterministic Python logic (a branch, a dict reference, a price comparison),
+so five identical tries would just prove the same thing five times; five
+different items/queries is a stronger test of the same rule. Criterion 1 and 4
+involve the model, so variety also guards against accidentally re-testing one
+easy case.
 """
 
 SCENARIOS = [
     {
-        # A query the data can match. Criterion 1.
+        # Criterion 1 — a matching query completes all three tools.
         "name": "matching query completes",
-        "query": "vintage graphic tee under $30",
-        "wardrobe": "example",
         "criterion": 1,
+        "wardrobe": "example",
+        "queries": [
+            "vintage graphic tee under $30",
+            "black leather jacket",
+            "denim jacket under $50",
+            "cargo pants",
+            "oversized hoodie",
+        ],
     },
     {
-        # A query nothing can match. Criterion 2 — the branch.
+        # Criterion 2 — an impossible query stops before suggest_outfit.
         "name": "impossible query stops early",
-        "query": "designer ballgown size XXS under $5",
-        "wardrobe": "example",
         "criterion": 2,
+        "wardrobe": "example",
+        "queries": [
+            "neon pink astronaut spacesuit helmet with laser horns under $5",
+            "designer ballgown size XXS under $5",
+            "cyberpunk hoverboard boots under $1",
+            "victorian steampunk submarine goggles under $2",
+            "medieval titanium knight armor under $3",
+        ],
+    },
+    {
+        # Criterion 3 — the item search_listings selected is the same dict
+        # suggest_outfit receives (session["selected_item"]'s id/title match).
+        "name": "selected item state matches what reaches suggest_outfit",
+        "criterion": 3,
+        "wardrobe": "example",
+        "queries": [
+            "vintage graphic tee under $30",
+            "black leather jacket",
+            "denim jacket under $50",
+            "cargo pants",
+            "oversized hoodie",
+        ],
+    },
+    {
+        # Criterion 4 — the fit card names the price and at least one hashtag.
+        "name": "fit card mentions price and a hashtag",
+        "criterion": 4,
+        "wardrobe": "example",
+        "queries": [
+            "vintage graphic tee under $30",
+            "black leather jacket",
+            "denim jacket under $50",
+            "cargo pants",
+            "oversized hoodie",
+        ],
+    },
+    {
+        # Criterion 5 — every returned listing respects the price ceiling.
+        "name": "price ceiling respected",
+        "criterion": 5,
+        "wardrobe": "example",
+        "queries": [
+            "graphic tee under $20",
+            "leather jacket under $30",
+            "denim jacket under $25",
+            "oversized hoodie under $40",
+            "cargo pants under $35",
+        ],
     },
     {
         # A user with nothing saved. One of unit 4's three failure modes.
         "name": "empty wardrobe",
-        "query": "denim jacket under $50",
-        "wardrobe": "empty",
         "criterion": None,
+        "wardrobe": "empty",
+        "queries": ["denim jacket under $50"],
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
 ]
 
 WARDROBES = ("example", "empty")
+
+
+def _queries(scenario: dict) -> list[str]:
+    """A scenario's queries, whether it uses "queries" (a list) or "query" (one)."""
+    queries = scenario.get("queries")
+    if queries:
+        return list(queries)
+    query = scenario.get("query", "")
+    return [query] if query else []
 
 
 def validate() -> list[str]:
     """Complain about anything malformed, before a long run rather than during."""
     problems = []
     for i, scenario in enumerate(SCENARIOS, 1):
-        if not scenario.get("query", "").strip():
+        queries = _queries(scenario)
+        if not queries or any(not q.strip() for q in queries):
             problems.append(f"scenario {i} has no query")
         if scenario.get("wardrobe") not in WARDROBES:
             problems.append(

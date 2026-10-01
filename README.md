@@ -227,17 +227,62 @@ For the empty search branch, I refined `session["error"]` so that instead of a g
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item in session matches item passed to suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card mentions price and at least one hashtag | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. All returned listings respect numeric price ceiling | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+Full output for all 30 tries (6 scenarios × 5 tries, including the empty-wardrobe
+diagnostic): `results/run_2026-09-30_2101_before.md`.
 
 **Real output from one try**, pasted as text, naming the file and function
-that produced it:
+that produced it — criterion 1, try 1, produced by `agent.py::run_agent`
+(via `run_eval.py::main`, which calls `tools.py::search_listings`,
+`tools.py::suggest_outfit`, and `tools.py::create_fit_card`):
 
 ```
+query: vintage graphic tee under $30
+selected_item: lst_002 — Y2K Baby Tee — Butterfly Print ($18.0, depop)
+search_results: 10
 
+Outfit suggestion:
+Here are two cohesive outfits you can build by pairing the Y2K Butterfly Baby Tee with items already in your wardrobe:
+
+### Outfit 1: Streetwear Contrast
+* **New Item:** Y2K Baby Tee — Butterfly Print
+* **Bottoms:** Baggy straight-leg jeans, dark wash
+* **Outerwear:** Vintage black denim jacket
+* **Shoes:** Chunky white sneakers
+* **Accessories:** Black crossbody bag
+
+**Why it works:** The tight, fitted silhouette of the baby tee creates a great proportion balance when paired with the voluminous, baggy dark-wash jeans. Throwing on the vintage black denim jacket ties in the Y2K/streetwear aesthetic, while the chunky white sneakers and black crossbody bag keep the look casual, comfortable, and effortlessly cool.
+
+---
+
+### Outfit 2: Casual Earth-Tone Mix
+* **New Item:** Y2K Baby Tee — Butterfly Print
+* **Bottoms:** Wide-leg khaki trousers
+* **Accessories:** Brown leather belt, Black crossbody bag
+* **Shoes:** Black combat boots (or chunky white sneakers)
+
+**Why it works:** This outfit bridges the gap between Y2K style and minimal earth tones. Tucking the pink, purple, and white butterfly tee into the wide-leg khaki trousers (cinched with the brown leather belt) highlights your waist while letting the statement graphic pop against the neutral tan base. Finish with the black combat boots to add a little grunge edge, or keep it light with the chunky white sneakers.
+
+Fit card:
+I am so obsessed with my new Y2K Butterfly Baby Tee that I just scored on Depop for only $18! I'm totally living for the contrast of styling this fitted graphic top with baggy denim for a streetwear vibe, or dressing it down with wide-leg trousers and combat boots for an earth-tone moment. Which look is your favorite? 🦋✨
+
+#thrifted #y2kstyle
+
+Trace:
+[1] search_listings
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[2] suggest_outfit
+      in:  dict with keys: item, wardrobe
+      out: Here are two cohesive outfits you can build by pairing the Y2K Butterfly Baby Tee with items already in your w…
+[3] create_fit_card
+      in:  dict with keys: item, outfit
+      out: I am so obsessed with my new Y2K Butterfly Baby Tee that I just scored on Depop for only $18! I'm totally livi…
 ```
 
 ---
@@ -262,15 +307,15 @@ that produced it:
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | A matching query completes all three tools | 4 of 5 | MET (5/5) | 5 different natural-language queries ("vintage graphic tee under $30", "black leather jacket", "denim jacket under $50", "cargo pants", "oversized hoodie") each produced a non-empty `search_results`, a `selected_item`, an `outfit_suggestion`, and a `fit_card`, with `session["error"]` left `None` every time. |
+| 2 | An impossible query stops before the second tool | 5 of 5 | MET (5/5) | 5 absurd queries ("neon pink astronaut spacesuit helmet…", "designer ballgown size XXS under $5", etc.) all returned `search_results: 0`, set a specific `session["error"]` naming what to adjust, and the trace shows only `[1] search_listings` — `suggest_outfit` and `create_fit_card` never ran. |
+| 3 | Item in session matches item passed to suggest_outfit | 5 of 5 | MET (5/5) | For each of the 5 matching queries, the outfit suggestion names the exact item in `session["selected_item"]` (e.g. selected_item "90s Leather Bomber — Black" → outfit text "pairing the **90s Leather Bomber**…"). `agent.py::run_agent` passes `new_item=session["selected_item"]` directly — the same dict reference — so this is guaranteed by construction, not just observed. |
+| 4 | Fit card mentions price and at least one hashtag | 4 of 5 | MET (5/5) | All 5 fit cards contain a `$` followed by a number matching `selected_item["price"]` (e.g. "$18", "$75", "$42", "$27", "$22.0") and at least one `#` hashtag (most had two, e.g. `#thrifted #streetwear`). |
+| 5 | All returned listings respect numeric price ceiling | 5 of 5 | MET (5/5) | For each of the 5 price-ceiling queries, every listing in `search_results` had `price <= max_price` — checked directly against the parsed ceiling, e.g. "under $20" → prices `[18.0, 15.0, 19.0, 20.0]`; "under $30" and "under $25" each returned only 1 item ($12.0 and $24.0) because few listings matched both the keywords and the price band — `search_listings`' AND-filter working as designed, not a miss. |
 
 **Diagnoses**
 
-
+No misses this run — all five criteria met their stated target (see `results/run_2026-09-30_2101_before.md` for the full 30-try output). The only thing worth flagging, not a miss: criterion 5's try 2 and try 3 ("leather jacket under $30", "denim jacket under $25") each matched only 1 listing, because `search_listings`' plain keyword-overlap scoring is strict — once the price ceiling narrows the candidate pool, a listing needs the query's exact words in its title/tags/description to score above 0. That's the same tradeoff criterion 1's "4 of 5" target already names; it just didn't happen to cause a miss in this run.
 
 ---
 
